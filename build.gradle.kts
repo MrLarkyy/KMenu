@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
 plugins {
-    kotlin("jvm") version "2.3.20" apply false
+    kotlin("jvm") version "2.3.21" apply false
     id("co.uzzu.dotenv.gradle") version "4.0.0"
 }
 
