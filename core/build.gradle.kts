@@ -4,9 +4,9 @@ plugins {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
-    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     api("gg.aquatic:Pakket:26.1.10")
-    api("gg.aquatic:Common:26.0.16") {
+    api("gg.aquatic:Common:26.0.17") {
         isChanging = true
     }
     api("gg.aquatic:Dispatch:26.0.5")
@@ -17,7 +17,7 @@ dependencies {
 
     testImplementation(kotlin("test"))
     testImplementation("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 }
 
 publishing {
