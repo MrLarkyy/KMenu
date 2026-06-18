@@ -8,6 +8,7 @@ import gg.aquatic.snapshotmap.SuspendingSnapshotMap
 import net.kyori.adventure.text.Component
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
+import org.slf4j.LoggerFactory
 import java.util.*
 
 /** Packet-backed inventory with manual slot management and updates. */
@@ -15,6 +16,9 @@ open class PacketInventory(
     title: Component,
     val type: InventoryType
 ) : Cloneable {
+    companion object {
+        private val logger = LoggerFactory.getLogger(PacketInventory::class.java)
+    }
 
     val viewers = SuspendingSnapshotMap<UUID, InventoryViewer>()
     val content = SnapshotMap<Int, ItemStack>()
@@ -38,10 +42,25 @@ open class PacketInventory(
         private set
 
     private fun createOpenPacket(): Any {
-        return Pakket.handler.openWindowPacket(126, type.menuType, title)
+        val packet = Pakket.handler.openWindowPacket(126, type.menuType, title)
+        logger.info(
+            "[KMenuDebug] Created open window packet. inventoryId=126, type={}, packetClass={}, thread={}",
+            type.menuType,
+            packet.javaClass.name,
+            Thread.currentThread().name,
+        )
+        return packet
     }
 
     fun sendInventoryOpenPacket(player: Player) {
+        logger.info(
+            "[KMenuDebug] Sending inventory open packet. player={}, inventoryId=126, type={}, packetClass={}, contentSlots={}, thread={}",
+            player.name,
+            type.menuType,
+            inventoryOpenPacket.javaClass.name,
+            content.keys.size,
+            Thread.currentThread().name,
+        )
         player.sendPacket(inventoryOpenPacket)
     }
 

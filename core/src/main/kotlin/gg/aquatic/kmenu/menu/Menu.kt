@@ -5,10 +5,12 @@ import gg.aquatic.kmenu.inventory.InventoryHandler
 import gg.aquatic.kmenu.inventory.InventoryType
 import gg.aquatic.kmenu.inventory.PacketInventory
 import gg.aquatic.kmenu.inventory.event.AsyncPacketInventoryInteractEvent
+import gg.aquatic.kmenu.packetInventory
 import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.Component
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
+import org.slf4j.LoggerFactory
 
 /**
  * Base menu implementation that renders components into a packet inventory.
@@ -18,6 +20,9 @@ open class Menu(
     type: InventoryType,
     val cancelBukkitInteractions: Boolean
 ): PacketInventory(title,type) {
+    companion object {
+        private val logger = LoggerFactory.getLogger(Menu::class.java)
+    }
 
 
     private val slotManager = SlotManager()
@@ -26,7 +31,21 @@ open class Menu(
     protected val components get() = slotManager.components
 
     open suspend fun open(player: Player) = withContext(KMenu.context) {
+        logger.info(
+            "[KMenuDebug] Menu.open called. player={}, menu={}, type={}, contentSlots={}, thread={}",
+            player.name,
+            this@Menu.javaClass.name,
+            type.menuType,
+            content.keys.size,
+            Thread.currentThread().name,
+        )
         InventoryHandler.openMenu(player, this@Menu)
+        logger.info(
+            "[KMenuDebug] Menu.open finished. player={}, attached={}, thread={}",
+            player.name,
+            player.packetInventory() === this@Menu,
+            Thread.currentThread().name,
+        )
     }
 
     suspend fun addComponent(component: MenuComponent) {

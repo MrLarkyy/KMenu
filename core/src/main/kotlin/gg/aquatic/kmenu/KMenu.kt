@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import org.bukkit.entity.Player
+import org.slf4j.LoggerFactory
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -20,6 +21,8 @@ import kotlin.coroutines.CoroutineContext
  * Call [initialize] once during plugin startup.
  */
 object KMenu {
+    private val logger = LoggerFactory.getLogger(KMenu::class.java)
+
     val packetInventories = SuspendingSnapshotMap<Player, PacketInventory>()
 
     lateinit var scope: CoroutineScope
@@ -31,6 +34,7 @@ object KMenu {
     /** Initialize with an existing [CoroutineScope]. */
     fun initialize(scope: CoroutineScope) {
         this.scope = scope
+        logger.info("[KMenuDebug] Initializing KMenu. scope={}, thread={}", scope, Thread.currentThread().name)
         InventoryHandler.initialize()
     }
 

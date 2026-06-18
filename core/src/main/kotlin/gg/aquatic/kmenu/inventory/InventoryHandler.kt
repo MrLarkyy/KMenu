@@ -19,8 +19,10 @@ import org.bukkit.entity.Player
 import org.bukkit.event.inventory.InventoryCloseEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.ItemStack
+import org.slf4j.LoggerFactory
 
 internal object InventoryHandler {
+    private val logger = LoggerFactory.getLogger(InventoryHandler::class.java)
 
     val eventBus by lazy {
         suspendingEventBusBuilder {
@@ -30,6 +32,7 @@ internal object InventoryHandler {
     }
 
     fun initialize() {
+        logger.info("[KMenuDebug] Initializing InventoryHandler. thread={}", Thread.currentThread().name)
         registerBukkitEvents()
         registerPacketEvents()
         MenuHandler.initialize()
@@ -37,32 +40,76 @@ internal object InventoryHandler {
 
     private fun registerBukkitEvents() {
         event<InventoryCloseEvent> {
+            logger.info(
+                "[KMenuDebug] Bukkit InventoryCloseEvent received. player={}, hasPacketInventory={}, thread={}",
+                it.player.name,
+                (it.player as? Player)?.packetInventory() != null,
+                Thread.currentThread().name,
+            )
             onCloseMenu(it.player as? Player ?: return@event, true)
         }
         event<PlayerQuitEvent> {
+            logger.info("[KMenuDebug] PlayerQuitEvent closing packet inventory. player={}", it.player.name)
             onCloseMenu(it.player, false)
         }
     }
 
     private fun registerPacketEvents() {
         packetEvent<PacketContainerCloseEvent> {
+            logger.info(
+                "[KMenuDebug] PacketContainerCloseEvent received. player={}, hasPacketInventory={}, thread={}",
+                it.player.name,
+                it.player.packetInventory() != null,
+                Thread.currentThread().name,
+            )
             it.then { onCloseMenu(it.player, true) }
         }
 
         packetEvent<PacketContainerOpenEvent> {
+            val currentInventory = it.player.packetInventory()
+            logger.info(
+                "[KMenuDebug] PacketContainerOpenEvent received. player={}, containerId={}, hasPacketInventory={}, ignored={}, thread={}",
+                it.player.name,
+                it.containerId,
+                currentInventory != null,
+                shouldIgnore(it.containerId, it.player),
+                Thread.currentThread().name,
+            )
             if (shouldIgnore(it.containerId, it.player)) {
+                logger.info(
+                    "[KMenuDebug] Ignoring open packet and closing tracked menu. player={}, containerId={}",
+                    it.player.name,
+                    it.containerId,
+                )
                 onCloseMenu(it.player, true)
                 return@packetEvent
             }
             val inventory = it.player.packetInventory() ?: return@packetEvent
             val viewer = inventory.viewers[it.player.uniqueId] ?: return@packetEvent
 
-            it.then { KMenu.scope.launch { updateInventoryContent(inventory, viewer) } }
+            it.then {
+                logger.info(
+                    "[KMenuDebug] Scheduling inventory content update after open. player={}, type={}, contentSlots={}",
+                    it.player.name,
+                    inventory.type.menuType,
+                    inventory.content.keys.size,
+                )
+                KMenu.scope.launch { updateInventoryContent(inventory, viewer) }
+            }
         }
 
         packetEvent<PacketContainerSetSlotEvent> {
             val inventory = it.player.packetInventory() ?: return@packetEvent
             inventory.viewers[it.player.uniqueId] ?: return@packetEvent
+            if (it.inventoryId == 126) {
+                logger.info(
+                    "[KMenuDebug] Cancelling tracked set slot packet. player={}, inventoryId={}, slot={}, thread={}",
+                    it.player.name,
+                    it.inventoryId,
+                    it.slot,
+                    Thread.currentThread().name,
+                )
+            }
             it.cancelled = true
         }
 
@@ -70,6 +117,13 @@ internal object InventoryHandler {
             if (it.inventoryId > 0 && shouldIgnore(it.inventoryId, it.player)) return@packetEvent
             val inventory = it.player.packetInventory() ?: return@packetEvent
             val viewer = inventory.viewers[it.player.uniqueId] ?: return@packetEvent
+            logger.info(
+                "[KMenuDebug] PacketContainerContentEvent received for tracked inventory. player={}, inventoryId={}, contents={}, thread={}",
+                it.player.name,
+                it.inventoryId,
+                it.contents.size,
+                Thread.currentThread().name,
+            )
             it.cancelled = true
             updateInventoryContent(inventory, viewer)
         }
@@ -172,6 +226,14 @@ internal object InventoryHandler {
 
     fun openMenu(player: Player, inventory: PacketInventory) {
         val previousMenu = player.packetInventory()
+        logger.info(
+            "[KMenuDebug] Opening packet menu. player={}, previousMenu={}, type={}, contentSlots={}, thread={}",
+            player.name,
+            previousMenu?.javaClass?.name,
+            inventory.type.menuType,
+            inventory.content.keys.size,
+            Thread.currentThread().name,
+        )
         if (previousMenu != null) {
             onCloseMenu(player, false)
         }
@@ -180,6 +242,12 @@ internal object InventoryHandler {
 
         val viewer = InventoryViewer(player)
         inventory.viewers[player.uniqueId] = viewer
+        logger.info(
+            "[KMenuDebug] Attached packet menu. player={}, attached={}, viewerPresent={}",
+            player.name,
+            player.packetInventory() === inventory,
+            inventory.viewers[player.uniqueId] === viewer,
+        )
 
         inventory.sendInventoryOpenPacket(player)
     }
@@ -191,6 +259,13 @@ internal object InventoryHandler {
 
     private fun onCloseMenu(player: Player, updateContent: Boolean) {
         val removed = player.packetInventory() ?: return
+        logger.info(
+            "[KMenuDebug] Closing packet menu. player={}, menu={}, updateContent={}, thread={}",
+            player.name,
+            removed.javaClass.name,
+            updateContent,
+            Thread.currentThread().name,
+        )
         KMenu.packetInventories.remove(player)
 
         removed.viewers.remove(player.uniqueId)
@@ -225,6 +300,14 @@ internal object InventoryHandler {
     }
 
     internal fun updateInventoryContent(inventory: PacketInventory, viewer: InventoryViewer) {
+        logger.info(
+            "[KMenuDebug] Updating inventory content. player={}, type={}, contentSlots={}, arraySize={}, thread={}",
+            viewer.player.name,
+            inventory.type.menuType,
+            inventory.content.keys.size,
+            inventory.type.size + 36,
+            Thread.currentThread().name,
+        )
         val items = arrayOfNulls<ItemStack?>(inventory.type.size + 36)
         for (i in 0 until inventory.type.size + 36) {
             items[i] = inventoryItemAt(inventory, viewer, i, allowPlayerFallback = false)
@@ -240,6 +323,12 @@ internal object InventoryHandler {
             viewer.carriedItem
         )
         val slotPacket = Pakket.handler.createSetSlotItemPacket(0, 0, 45, offHandItem)
+        logger.info(
+            "[KMenuDebug] Sending inventory content packets. player={}, contentPacket={}, offhandPacket={}",
+            viewer.player.name,
+            contentPacket.javaClass.name,
+            slotPacket.javaClass.name,
+        )
         Pakket.handler.sendPacket(contentPacket, true, viewer.player)
         Pakket.handler.sendPacket(slotPacket, true, viewer.player)
     }
